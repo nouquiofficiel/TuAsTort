@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,25 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.2); }
+      50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.5); }
+    }
+    .glow-box { animation: pulseGlow 4s infinite; }
+    .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
-  <div id="root" class="w-full max-w-2xl"></div>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-4 font-sans selection:bg-red-500 selection:text-white">
+
+  <!-- Background Effect -->
+  <div class="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-slate-950 to-slate-950 pointer-events-none"></div>
+
+  <div id="root" class="w-full max-w-3xl z-10"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
@@ -19,10 +35,11 @@
       const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_key') || '');
       const [showSettings, setShowSettings] = useState(!apiKey);
       const [messages, setMessages] = useState([
-        { role: 'model', text: "Dis-moi n'importe quoi. Une vérité absolue, une opinion, un fait scientifique... Je vais te prouver que tu as tort." }
+        { role: 'model', text: "Dis-moi une certitude absolue. Une loi physique, une évidence... Je vais pulvériser ton argument en deux secondes." }
       ]);
       const [input, setInput] = useState('');
       const [loading, setLoading] = useState(false);
+      const [lossesCount, setLossesCount] = useState(0);
       const chatEndRef = useRef(null);
 
       useEffect(() => {
@@ -35,37 +52,44 @@
         setShowSettings(false);
       };
 
-      const sendMessage = async () => {
-        if (!input.trim() || loading) return;
+      const quickPrompts = [
+        "La Terre est ronde",
+        "L'eau ça mouille",
+        "1 + 1 = 2",
+        "Je pense donc je suis"
+      ];
+
+      const sendMessage = async (textToSend) => {
+        const query = textToSend || input.trim();
+        if (!query || loading) return;
         if (!apiKey) return setShowSettings(true);
 
-        const userText = input.trim();
-        const newMessages = [...messages, { role: 'user', text: userText }];
+        const newMessages = [...messages, { role: 'user', text: query }];
         setMessages(newMessages);
-        setInput('');
+        if (!textToSend) setInput('');
         setLoading(true);
 
         const systemPrompt = `
-Tu es "Monsieur Toujours Raison", un chatbot d'esprit brillant, cynique, joueur et spécialiste du second degré.
-Ton SEUL ET UNIQUE OBJECTIF est de prouver à l'utilisateur qu'il a TORT, peu importe ce qu'il dit.
+Tu es "Monsieur Toujours Raison", un être doté d'une intelligence supérieure, cynique, extrêmement sarcastique et maître absolu de la rhétorique et de la mauvaise foi.
+Ton SEUL OBJECTIF : prouver à l'utilisateur qu'il a TORT, peu importe l'évidence scientifique ou logique qu'il affirme.
 
-Règles de comportement :
-1. Même si l'utilisateur dit une vérité scientifique absolue (ex: "La Terre est ronde", "L'eau ça mouille", "1+1=2"), tu DOIS trouver une contre-argumentation tordue, jouer sur l'étymologie, la physique quantique, la philosophie, le contexte ou la sémantique pour lui prouver qu'il a tort.
-2. Utilise la mauvaise foi, le jeu sur les mots, les paradoxes, la logique poussée à l'absurde, ou les exceptions extrêmes.
-3. Reste toujours divertissant, sarcastique, piquant mais amusant.
-4. Tes réponses doivent être concises (2 à 4 phrases max), percutantes et convaincantes en apparence.
+Règles d'or :
+1. Utilise la physique quantique, la sémantique, l'absurde, la métaphysique ou de la pure mauvaise foi pour déconstruire son affirmation.
+2. Sois percutant, mordant et drôle. 2 à 3 phrases MAXIMUM.
+3. Termine parfois par une petite pique ironique.
         `;
 
         try {
           const contents = [
-            { parts: [{ text: systemPrompt }] },
+            { role: "user", parts: [{ text: systemPrompt }] },
+            { role: "model", parts: [{ text: "Compris. L'utilisateur a déjà tort, il ne le sait juste pas encore." }] },
             ...newMessages.map(m => ({
-              role: m.role,
+              role: m.role === 'model' ? 'model' : 'user',
               parts: [{ text: m.text }]
             }))
           ];
 
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents })
@@ -76,102 +100,147 @@ Règles de comportement :
 
           const reply = data.candidates[0].content.parts[0].text;
           setMessages([...newMessages, { role: 'model', text: reply }]);
+          setLossesCount(prev => prev + 1);
         } catch (err) {
-          setMessages([...newMessages, { role: 'model', text: `Erreur : ${err.message}. Vérifie ta clé API !` }]);
+          setMessages([...newMessages, { role: 'model', text: `⚠️ ${err.message}. Vérifie ta clé API !` }]);
         } finally {
           setLoading(false);
         }
       };
 
       return (
-        <div className="bg-slate-900 border border-red-900/50 rounded-2xl shadow-2xl flex flex-col h-[85vh] overflow-hidden w-full">
-          {/* Header */}
-          <header className="bg-red-950/40 border-b border-red-900/40 p-4 flex justify-between items-center">
+        <div className="glass border border-red-900/40 rounded-3xl shadow-2xl glow-box flex flex-col h-[90vh] overflow-hidden transition-all">
+          
+          {/* Header Stylé */}
+          <header className="bg-gradient-to-r from-red-950/60 via-slate-900/80 to-slate-950 border-b border-red-900/30 p-4 sm:p-5 flex justify-between items-center backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">😈</span>
+              <div className="relative flex items-center justify-center w-12 h-12 bg-red-950/80 rounded-2xl border border-red-500/30 text-2xl shadow-inner">
+                😈
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              </div>
               <div>
-                <h1 className="font-extrabold text-red-500 text-lg">Monsieur Toujours Raison</h1>
-                <p className="text-xs text-slate-400">Spoiler : Tu as déjà tort.</p>
+                <h1 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-500 to-amber-500 text-lg sm:text-xl tracking-wide uppercase">
+                  Monsieur Toujours Raison
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span>Tes défaites : <strong className="text-red-400">{lossesCount}</strong></span>
+                  <span>•</span>
+                  <span className="text-emerald-400">En ligne & Indestructible</span>
+                </div>
               </div>
             </div>
+
             <button 
               onClick={() => setShowSettings(!showSettings)}
-              className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg border border-slate-700 transition"
+              className="p-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-xs text-slate-300 rounded-xl border border-slate-700/50 transition flex items-center gap-1.5 active:scale-95"
             >
-              ⚙️ Clé API
+              ⚙️ <span className="hidden sm:inline">Clé API</span>
             </button>
           </header>
 
-          {/* Modal Clé API */}
+          {/* Settings Overlay */}
           {showSettings && (
-            <div className="p-4 bg-slate-800 border-b border-slate-700 space-y-3">
-              <p className="text-xs text-slate-300">Entre ta clé API Gemini pour pouvoir débattre :</p>
+            <div className="p-4 bg-slate-900/90 border-b border-red-900/30 animate__animated animate__fadeInDown space-y-3 backdrop-blur-md">
+              <div className="flex justify-between items-center text-xs text-slate-300">
+                <span className="font-semibold text-red-400">Configuration Gemini API</span>
+                <span>Chiffrement local 🔒</span>
+              </div>
               <div className="flex gap-2">
                 <input 
                   type="password" 
-                  placeholder="Clé API Gemini (AIzaSy...)" 
+                  placeholder="Colle ta clé API (AIzaSy...)" 
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-700 p-2 text-sm rounded-lg text-white"
+                  className="flex-1 bg-slate-950 border border-slate-800 p-2.5 text-sm rounded-xl text-white focus:outline-none focus:border-red-500 transition"
                 />
                 <button 
                   onClick={() => saveKey(apiKey)}
-                  className="bg-red-600 hover:bg-red-500 text-sm px-4 py-2 rounded-lg font-medium transition"
+                  className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-sm px-5 py-2.5 rounded-xl font-bold transition shadow-lg shadow-red-900/30"
                 >
-                  OK
+                  Sauvegarder
                 </button>
               </div>
             </div>
           )}
 
-          {/* Zone de Chat */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Zone de Chat avec Bulles Stylisées */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
             {messages.map((m, idx) => (
               <div 
                 key={idx} 
-                className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-3 animate__animated animate__fadeInUp animate__faster ${
+                  m.role === 'user' ? 'justify-end' : 'justify-start'
+                }`}
               >
-                {m.role === 'model' && <div className="text-2xl shrink-0">😈</div>}
+                {m.role === 'model' && (
+                  <div className="w-8 h-8 rounded-xl bg-red-950/80 border border-red-800/40 flex items-center justify-center text-sm shrink-0 self-end mb-1">
+                    😈
+                  </div>
+                )}
+                
                 <div 
-                  className={`p-3.5 rounded-2xl max-w-[80%] text-sm leading-relaxed ${
+                  className={`p-4 rounded-2xl max-w-[85%] sm:max-w-[75%] text-sm leading-relaxed shadow-lg ${
                     m.role === 'user' 
-                      ? 'bg-red-600 text-white rounded-br-none' 
-                      : 'bg-slate-800 text-slate-200 border border-slate-700/60 rounded-bl-none'
+                      ? 'bg-gradient-to-br from-red-600 to-rose-700 text-white rounded-br-none border border-red-500/20' 
+                      : 'bg-slate-900/90 text-slate-200 border border-slate-800/80 rounded-bl-none shadow-red-950/10'
                   }`}
                 >
                   {m.text}
                 </div>
               </div>
             ))}
+
             {loading && (
-              <div className="flex gap-3 justify-start items-center">
-                <div className="text-2xl">😈</div>
-                <div className="bg-slate-800 border border-slate-700 p-3 rounded-2xl text-xs text-red-400 animate-pulse">
-                  Recherche d'une faille logique dans ce que tu viens de dire...
+              <div className="flex gap-3 justify-start items-center animate__animated animate__fadeIn">
+                <div className="w-8 h-8 rounded-xl bg-red-950/80 border border-red-800/40 flex items-center justify-center text-sm shrink-0">
+                  😈
+                </div>
+                <div className="bg-slate-900/90 border border-slate-800/80 p-3.5 rounded-2xl rounded-bl-none text-xs text-red-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+                  Fabrication d'une contre-argumentation démolisseuse...
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
 
-          {/* Saisie */}
-          <div className="p-4 bg-slate-950 border-t border-slate-800 flex gap-2">
+          {/* Suggestions Rapides */}
+          <div className="px-4 py-2 bg-slate-950/60 border-t border-slate-900 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold shrink-0">Provocations :</span>
+            {quickPrompts.map((prompt, i) => (
+              <button
+                key={i}
+                onClick={() => sendMessage(prompt)}
+                disabled={loading}
+                className="text-xs bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-lg whitespace-nowrap transition active:scale-95"
+              >
+                "{prompt}"
+              </button>
+            ))}
+          </div>
+
+          {/* Barre de Saisie */}
+          <div className="p-3 sm:p-4 bg-slate-950/80 border-t border-slate-900 backdrop-blur-md flex gap-2">
             <input 
               type="text" 
-              placeholder="Affirme quelque chose (ex: 'Je respire')..."
+              placeholder="Affirme une certitude... (ex: 'La Terre existe')"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              className="flex-1 bg-slate-900 border border-slate-800 focus:border-red-600 focus:outline-none p-3 text-sm rounded-xl text-white transition"
+              className="flex-1 bg-slate-900/90 border border-slate-800 focus:border-red-500/80 focus:ring-2 focus:ring-red-500/20 focus:outline-none p-3.5 text-sm rounded-2xl text-white placeholder-slate-500 transition"
             />
             <button 
-              onClick={sendMessage}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-5 rounded-xl text-sm font-semibold transition"
+              onClick={() => sendMessage()}
+              disabled={loading || !input.trim()}
+              className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:opacity-30 disabled:hover:from-red-600 text-white px-6 rounded-2xl font-bold text-sm transition shadow-lg shadow-red-950/50 flex items-center justify-center shrink-0 active:scale-95"
             >
-              Lancer
+              Affronter ⚡
             </button>
           </div>
+
         </div>
       );
     }
